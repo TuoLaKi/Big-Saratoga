@@ -2,16 +2,16 @@
 const GAME_CONFIG = {
     // 物体种类和对应的尺寸、分数
     items: [
-        { id: 1, size: 30, score: 1, image: 'img/01.png' },
-        { id: 2, size: 40, score: 3, image: 'img/02.png' },
-        { id: 3, size: 50, score: 6, image: 'img/03.png' },
-        { id: 4, size: 65, score: 10, image: 'img/04.png' },
-        { id: 5, size: 80, score: 15, image: 'img/05.png' },
-        { id: 6, size: 95, score: 21, image: 'img/06.png' },
-        { id: 7, size: 110, score: 28, image: 'img/07.png' },
-        { id: 8, size: 130, score: 36, image: 'img/08.png' },
-        { id: 9, size: 150, score: 45, image: 'img/09.png' },
-        { id: 10, size: 170, score: 55, image: 'img/10.png' }
+        { id: 1, size: 30, score: 1, image: 'img/01.webp' },
+        { id: 2, size: 40, score: 3, image: 'img/02.webp' },
+        { id: 3, size: 50, score: 6, image: 'img/03.webp' },
+        { id: 4, size: 65, score: 10, image: 'img/04.webp' },
+        { id: 5, size: 80, score: 15, image: 'img/05.webp' },
+        { id: 6, size: 95, score: 21, image: 'img/06.webp' },
+        { id: 7, size: 110, score: 28, image: 'img/07.webp' },
+        { id: 8, size: 130, score: 36, image: 'img/08.webp' },
+        { id: 9, size: 150, score: 45, image: 'img/09.webp' },
+        { id: 10, size: 170, score: 55, image: 'img/10.webp' }
     ],
     // 初始随机生成的物体类型（较小的）
     initialItemTypes: [1, 2, 3],
@@ -129,7 +129,7 @@ function addNewItem(x, y, type) {
     const size = itemConfig.size;
     
     // 使用预加载的图像对象
-    const scaleFactor = size / 500; // 因为我们的png现在是500x500
+    const scaleFactor = size / 500; // 因为我们的webp现在是500x500
       // 创建物理碰撞体
     const item = Bodies.circle(x, y, size / 2, {
         restitution: GAME_CONFIG.physics.restitution,
