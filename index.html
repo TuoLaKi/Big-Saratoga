@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<link rel="icon" href="favicon.ico" type="image/x-icon">
+    <title>合成小加加</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>    <div class="game-container">        <div class="game-top-bar">
+            <div class="next-item-container">
+                <div class="next-item-label">下一个:</div>
+                <div id="next-item"></div>
+            </div>
+            <div id="current-item-holder"></div>
+            <div class="score-container"><span id="score">0</span></div>
+        </div>
+        
+        <div id="game-board">
+            <div id="drop-indicator" class="hidden"></div>
+        </div>
+        
+        <div class="game-bottom-bar">
+            <h1>合成小加加</h1>
+            <button id="restart-btn">重新开始</button>
+        </div>
+        <div class="game-over hidden" id="game-over">
+            <div class="game-over-content">
+                <h2>游戏结束</h2>
+                <p>您的最终分数: <span id="final-score">0</span></p>
+                <button id="play-again-btn">再玩一次</button>
+            </div>
+        </div>    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.18.0/matter.min.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
