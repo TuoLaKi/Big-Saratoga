@@ -352,7 +352,7 @@ Events.on(engine, 'collisionStart', (event) => {
                 }
                 
                 // 检查物体是否仍在接触顶部区域（考虑一定的误差范围）
-                const stillInContact = item.position.y - item.circleRadius <= topLine.position.y + 5;
+                const stillInContact = item.position.y - item.circleRadius <= topLine.position.y - 5;
                 
                 if (!stillInContact) {
                     // 如果不再接触，重置接触时间并移除警告效果
@@ -502,10 +502,20 @@ function initGame() {
 
 // 预加载所有图像
 function preloadImages() {
+    const loadingScreen = document.getElementById('loading-screen');
+    const loadingProgress = loadingScreen.querySelector('.loading-progress');
+    let loadedCount = 0;
+    const totalImages = GAME_CONFIG.items.length;
+
     const images = GAME_CONFIG.items.map(item => {
         return new Promise((resolve, reject) => {
             const img = new Image();
-            img.onload = () => resolve(img);
+            img.onload = () => {
+                loadedCount++;
+                const progress = Math.round((loadedCount / totalImages) * 100);
+                loadingProgress.textContent = `${progress}%`;
+                resolve(img);
+            };
             img.onerror = reject;
             img.src = item.image;
         });
@@ -516,11 +526,23 @@ function preloadImages() {
 
 // 页面加载完成后初始化游戏
 window.addEventListener('load', () => {
+    const loadingScreen = document.getElementById('loading-screen');
+    
     preloadImages().then(() => {
-        initGame();
+        // 添加淡出动画
+        loadingScreen.style.opacity = '0';
+        setTimeout(() => {
+            loadingScreen.style.display = 'none';
+            initGame();
+        }, 500);
     }).catch(error => {
         console.error('Error preloading images:', error);
-        initGame(); // 即使预加载失败也尝试启动游戏
+        // 即使加载失败也要隐藏加载画面并启动游戏
+        loadingScreen.style.opacity = '0';
+        setTimeout(() => {
+            loadingScreen.style.display = 'none';
+            initGame();
+        }, 500);
     });
 });
 
