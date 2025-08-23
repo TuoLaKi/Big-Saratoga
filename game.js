@@ -99,9 +99,9 @@ const bottomWall = Bodies.rectangle(
 // 顶部游戏结束线
 const topLine = Bodies.rectangle(
     gameBoard.offsetWidth / 2, 
-    100, 
+    100, //正常值为100，其他值用于测试
     gameBoard.offsetWidth, 
-    5,
+    2,
     { 
         isStatic: true, 
         isSensor: true,
@@ -270,13 +270,26 @@ function mergeItems(itemA, itemB) {
     const positionX = (itemA.position.x + itemB.position.x) / 2;
     const positionY = (itemA.position.y + itemB.position.y) / 2;
     
+    // 清除任何正在进行的倒计时警告
+    if (itemA.warningElement && itemA.warningElement.parentNode) {
+        gameBoard.removeChild(itemA.warningElement);
+    }
+    if (itemB.warningElement && itemB.warningElement.parentNode) {
+        gameBoard.removeChild(itemB.warningElement);
+    }
+
     // 从世界和状态中移除旧物体
     World.remove(engine.world, itemA);
     World.remove(engine.world, itemB);
     state.items = state.items.filter(item => item !== itemA && item !== itemB);
-      // 添加新物体（升级一级）
+
+    // 添加新物体（升级一级）
     const newType = typeA + 1;
-    addNewItem(positionX, positionY, newType);
+    const newItem = addNewItem(positionX, positionY, newType);
+    
+    // 确保新物体不继承任何倒计时状态
+    newItem.topLineContactTime = null;
+    newItem.warningElement = null;
     
     // 更新分数
     updateScore(GAME_CONFIG.items[newType - 1].score);
@@ -299,6 +312,13 @@ Events.on(engine, 'collisionStart', (event) => {
         const bodyA = pairs[i].bodyA;
         const bodyB = pairs[i].bodyB;
         
+        // 检查是否碰到底部墙壁
+        if ((bodyA === bottomWall && bodyB.label.startsWith('item-')) ||
+            (bodyB === bottomWall && bodyA.label.startsWith('item-'))) {
+            const item = bodyA === bottomWall ? bodyB : bodyA;
+            item.hasHitBottom = true;
+        }
+        
         // 检测相同类型的物体碰撞
         if (bodyA.label.startsWith('item-') && bodyB.label.startsWith('item-') && 
             bodyA.itemType === bodyB.itemType) {
@@ -311,8 +331,9 @@ Events.on(engine, 'collisionStart', (event) => {
             (bodyB.label === 'topLine' && bodyA.label.startsWith('item-'))) {
             const item = bodyA.label.startsWith('item-') ? bodyA : bodyB;
             
-            // 记录物体开始接触顶部的时间
-            if (!item.topLineContactTime) {
+            // 记录物体开始接触顶部的时间，但只在物体速度较小时才触发
+            const speed = Math.sqrt(item.velocity.x * item.velocity.x + item.velocity.y * item.velocity.y);
+            if (!item.topLineContactTime && speed < 2) { // 速度阈值设为2，可以根据需要调整
                 item.topLineContactTime = Date.now();
                 
                 // 创建警告效果
@@ -320,9 +341,9 @@ Events.on(engine, 'collisionStart', (event) => {
                 warningElement.className = 'warning-indicator';
                 warningElement.style.position = 'absolute';
                 warningElement.style.left = item.position.x + 'px';
-                warningElement.style.top = '97.5px';
+                warningElement.style.top = '99px';
                 warningElement.style.width = '50px';
-                warningElement.style.height = '5px';
+                warningElement.style.height = '2px';
                 warningElement.style.backgroundColor = 'rgba(255, 0, 0, 0.5)';
                 warningElement.style.transition = 'width 3s linear';
                 gameBoard.appendChild(warningElement);
@@ -352,7 +373,7 @@ Events.on(engine, 'collisionStart', (event) => {
                 }
                 
                 // 检查物体是否仍在接触顶部区域（考虑一定的误差范围）
-                const stillInContact = item.position.y - item.circleRadius <= topLine.position.y - 5;
+                const stillInContact = item.position.y - item.circleRadius <= topLine.position.y;
                 
                 if (!stillInContact) {
                     // 如果不再接触，重置接触时间并移除警告效果
