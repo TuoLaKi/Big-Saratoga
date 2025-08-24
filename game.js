@@ -153,6 +153,9 @@ function addNewItem(x, y, type) {
         frictionAir: 0.02 // 添加少量空气阻力
     });
     
+    // 添加生成时间戳，用于0.5秒保护期
+    item.createdAt = Date.now();
+    
     World.add(engine.world, item);
     state.items.push(item);
     
@@ -339,31 +342,41 @@ Events.on(engine, 'collisionStart', (event) => {
             (bodyB.label === 'topLine' && bodyA.label.startsWith('item-'))) {
             const item = bodyA.label.startsWith('item-') ? bodyA : bodyB;
             
-            // 记录物体开始接触顶部的时间，但只在物体速度较小时才触发
-            const speed = Math.sqrt(item.velocity.x * item.velocity.x + item.velocity.y * item.velocity.y);
-            if (!item.topLineContactTime && speed < 2) { // 速度阈值设为2，可以根据需要调整
+            // 检查物体是否确实在顶部线以上（即物体的顶部已经穿过了结束线）
+            const itemTop = item.position.y - item.circleRadius;
+            const topLinePosition = topLine.position.y;
+            
+            // 检查物体是否在0.5秒保护期内（刚生成的物体不会触发警告）
+            const currentTime = Date.now();
+            const isInProtectionPeriod = item.createdAt && (currentTime - item.createdAt) < 500; // 0.5秒保护期
+            
+            // 如果物体顶部已经到达或超过结束线位置，立即开始计时
+            if (!item.topLineContactTime && itemTop <= topLinePosition) {
                 item.topLineContactTime = Date.now();
                 
-                // 创建警告效果
-                const warningElement = document.createElement('div');
-                warningElement.className = 'warning-indicator';
-                warningElement.style.position = 'absolute';
-                warningElement.style.left = item.position.x + 'px';
-                warningElement.style.top = '99px';
-                warningElement.style.width = '50px';
-                warningElement.style.height = '2px';
-                warningElement.style.backgroundColor = 'rgba(255, 0, 0, 0.5)';
-                warningElement.style.transition = 'width 3s linear';
-                gameBoard.appendChild(warningElement);
-                
-                item.warningElement = warningElement;
-                
-                // 开始填充动画
-                setTimeout(() => {
-                    if (warningElement.parentNode) {
-                        warningElement.style.width = '0';
-                    }
-                }, 50);
+                // 只有不在保护期内的物体才显示警告效果
+                if (!isInProtectionPeriod) {
+                    // 创建警告效果
+                    const warningElement = document.createElement('div');
+                    warningElement.className = 'warning-indicator';
+                    warningElement.style.position = 'absolute';
+                    warningElement.style.left = item.position.x + 'px';
+                    warningElement.style.top = '99px';
+                    warningElement.style.width = '50px';
+                    warningElement.style.height = '2px';
+                    warningElement.style.backgroundColor = 'rgba(255, 0, 0, 0.5)';
+                    warningElement.style.transition = 'width 3s linear';
+                    gameBoard.appendChild(warningElement);
+                    
+                    item.warningElement = warningElement;
+                    
+                    // 开始填充动画
+                    setTimeout(() => {
+                        if (warningElement.parentNode) {
+                            warningElement.style.width = '0';
+                        }
+                    }, 50);
+                }
             }
             
             // 设置3秒的持续接触时间
@@ -381,7 +394,8 @@ Events.on(engine, 'collisionStart', (event) => {
                 }
                 
                 // 检查物体是否仍在接触顶部区域（考虑一定的误差范围）
-                const stillInContact = item.position.y - item.circleRadius <= topLine.position.y;
+                const itemTop = item.position.y - item.circleRadius;
+                const stillInContact = itemTop <= topLine.position.y + 5; // 允许5像素的误差范围
                 
                 if (!stillInContact) {
                     // 如果不再接触，重置接触时间并移除警告效果
@@ -400,7 +414,8 @@ Events.on(engine, 'collisionStart', (event) => {
                         const contactDuration = Date.now() - item.topLineContactTime;
                         if (contactDuration >= requiredContactTime && !state.isGameOver) {
                             // 最后再次确认物体仍在接触
-                            const finalCheck = item.position.y - item.circleRadius <= topLine.position.y + 5;
+                            const itemTop = item.position.y - item.circleRadius;
+                            const finalCheck = itemTop <= topLine.position.y + 10; // 最终检查时允许更大的误差
                             if (finalCheck) {
                                 gameBoard.removeChild(item.warningElement);
                                 item.warningElement = null;
