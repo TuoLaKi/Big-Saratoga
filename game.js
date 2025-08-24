@@ -227,6 +227,14 @@ function gameOver() {
 
 // 重新开始游戏
 function restartGame() {
+    // 清除所有警告元素
+    const warningElements = document.querySelectorAll('.warning-indicator');
+    warningElements.forEach(element => {
+        if (element.parentNode) {
+            element.parentNode.removeChild(element);
+        }
+    });
+    
     // 清除所有物体
     World.clear(engine.world, false);
     World.add(engine.world, [leftWall, rightWall, bottomWall, topLine]);
