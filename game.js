@@ -153,8 +153,12 @@ function addNewItem(x, y, type) {
         frictionAir: 0.02 // 添加少量空气阻力
     });
     
-    // 添加生成时间戳，用于0.5秒保护期
-    item.createdAt = Date.now();
+    // 初始化倒计时相关状态
+    item.topLineContactTime = null;
+    item.checkInterval = null;
+    item.isWarning = false;
+    item.blinkInterval = null;
+    item.warningElement = null;
     
     World.add(engine.world, item);
     state.items.push(item);
@@ -230,11 +234,14 @@ function gameOver() {
 
 // 重新开始游戏
 function restartGame() {
-    // 清除所有警告元素
-    const warningElements = document.querySelectorAll('.warning-indicator');
-    warningElements.forEach(element => {
-        if (element.parentNode) {
-            element.parentNode.removeChild(element);
+    // 清除所有物体的警告效果和倒计时
+    state.items.forEach(item => {
+        removeWarningEffect(item);
+        // 清除倒计时相关状态
+        item.topLineContactTime = null;
+        if (item.checkInterval) {
+            clearInterval(item.checkInterval);
+            item.checkInterval = null;
         }
     });
     
@@ -281,12 +288,18 @@ function mergeItems(itemA, itemB) {
     const positionX = (itemA.position.x + itemB.position.x) / 2;
     const positionY = (itemA.position.y + itemB.position.y) / 2;
     
-    // 清除任何正在进行的倒计时警告
-    if (itemA.warningElement && itemA.warningElement.parentNode) {
-        gameBoard.removeChild(itemA.warningElement);
+    // 清除任何正在进行的倒计时警告和定时器
+    removeWarningEffect(itemA);
+    removeWarningEffect(itemB);
+    
+    // 清除倒计时相关状态
+    if (itemA.checkInterval) {
+        clearInterval(itemA.checkInterval);
+        itemA.checkInterval = null;
     }
-    if (itemB.warningElement && itemB.warningElement.parentNode) {
-        gameBoard.removeChild(itemB.warningElement);
+    if (itemB.checkInterval) {
+        clearInterval(itemB.checkInterval);
+        itemB.checkInterval = null;
     }
 
     // 从世界和状态中移除旧物体
@@ -301,6 +314,7 @@ function mergeItems(itemA, itemB) {
     // 确保新物体不继承任何倒计时状态
     newItem.topLineContactTime = null;
     newItem.warningElement = null;
+    newItem.checkInterval = null;
     
     // 更新分数
     updateScore(GAME_CONFIG.items[newType - 1].score);
@@ -313,6 +327,152 @@ function mergeItems(itemA, itemB) {
         // 普通合并特效
         playMergeEffect(positionX, positionY, newType);
     }
+}
+
+// 创建警告效果
+function createWarningEffect(item) {
+    // 为物体添加闪烁效果
+    item.isWarning = true;
+    item.warningStartTime = Date.now();
+    
+    // 开始闪烁效果
+    startBlinkingEffect(item);
+}
+
+// 开始闪烁效果
+function startBlinkingEffect(item) {
+    const blinkInterval = setInterval(() => {
+        if (!item.isWarning || state.isGameOver || !item.position) {
+            clearInterval(blinkInterval);
+            return;
+        }
+        
+        // 切换透明度闪烁状态
+        if (item.render) {
+            if (item.isBlinking) {
+                // 恢复正常透明度
+                item.render.opacity = 1;
+                item.render.fillStyle = undefined;
+                item.isBlinking = false;
+            } else {
+                // 设置半透明状态
+                item.render.opacity = 0.3;
+                item.render.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                item.isBlinking = true;
+            }
+        }
+    }, 200); // 固定200ms闪烁间隔
+    
+    item.blinkInterval = blinkInterval;
+}
+
+// 移除警告效果
+function removeWarningEffect(item) {
+    if (item.isWarning) {
+        item.isWarning = false;
+        
+        // 清除闪烁间隔
+        if (item.blinkInterval) {
+            clearInterval(item.blinkInterval);
+            item.blinkInterval = null;
+        }
+        
+        // 清除检查间隔
+        if (item.checkInterval) {
+            clearInterval(item.checkInterval);
+            item.checkInterval = null;
+        }
+        
+        // 恢复原始状态
+        if (item.render) {
+            item.render.opacity = 1;
+            item.render.fillStyle = undefined;
+        }
+        
+        // 清理状态
+        item.isBlinking = false;
+        item.warningStartTime = null;
+        item.topLineContactTime = null;
+    }
+}
+
+// 更新警告效果位置
+function updateWarningPosition(item) {
+    // 固定150ms闪烁间隔，不需要渐进式变化
+    // 闪烁效果直接作用于物体本身，不需要位置更新
+}
+
+// 处理顶线接触警告
+function handleTopLineWarning(item) {
+    // 检查物体是否确实在顶部线以上（即物体的顶部已经穿过了结束线）
+    const itemTop = item.position.y - item.circleRadius;
+    const topLinePosition = topLine.position.y;
+    
+    // 调试信息
+    // console.log(`物体${item.itemType}接触顶线，itemTop: ${itemTop}, topLinePosition: ${topLinePosition}, 当前topLineContactTime: ${item.topLineContactTime}`);
+    
+    // 如果物体顶部已经到达或超过结束线位置，立即开始计时
+    if (!item.topLineContactTime && itemTop <= topLinePosition) {
+        item.topLineContactTime = Date.now();
+        // console.log(`物体${item.itemType}开始计时，时间戳: ${item.topLineContactTime}`);
+        createWarningEffect(item);
+    }
+    
+    // 设置3秒的持续接触时间
+    const requiredContactTime = 3000;
+    
+    // 每100ms检查一次是否仍在接触
+    const checkInterval = setInterval(() => {
+        // 如果游戏已结束或物体被销毁，停止检查并移除警告效果
+        if (state.isGameOver || !item.position) {
+            clearInterval(checkInterval);
+            item.checkInterval = null;
+            removeWarningEffect(item);
+            return;
+        }
+        
+        // 检查物体是否仍在接触顶部区域（考虑一定的误差范围）
+        const itemTop = item.position.y - item.circleRadius;
+        const stillInContact = itemTop <= topLine.position.y + 5; // 允许5像素的误差范围
+        
+        if (!stillInContact) {
+            // 如果不再接触，重置接触时间并移除警告效果
+            // console.log(`物体${item.itemType}离开顶线，重置topLineContactTime`);
+            item.topLineContactTime = null;
+            removeWarningEffect(item);
+            clearInterval(checkInterval);
+            item.checkInterval = null;
+        } else {
+            // 更新警告效果的位置
+            updateWarningPosition(item);
+            
+            // 只有在物体持续接触且有有效的开始时间时才检查时间
+            if (item.topLineContactTime) {
+                const contactDuration = Date.now() - item.topLineContactTime;
+                // console.log(`物体${item.itemType}持续接触，时间: ${contactDuration}ms`);
+                if (contactDuration >= requiredContactTime && !state.isGameOver) {
+                    // 最后再次确认物体仍在接触
+                    const itemTop = item.position.y - item.circleRadius;
+                    const finalCheck = itemTop <= topLine.position.y + 10; // 最终检查时允许更大的误差
+                    if (finalCheck) {
+                        removeWarningEffect(item);
+                        clearInterval(checkInterval);
+                        item.checkInterval = null;
+                        gameOver();
+                    } else {
+                        // 如果最后检查发现已经离开，重置计时
+                        item.topLineContactTime = null;
+                        removeWarningEffect(item);
+                    }
+                    clearInterval(checkInterval);
+                    item.checkInterval = null;
+                }
+            }
+        }
+    }, 100);
+    
+    // 将定时器存储在物体对象上，以便在重新开始游戏时清理
+    item.checkInterval = checkInterval;
 }
 
 // 处理碰撞事件
@@ -341,96 +501,7 @@ Events.on(engine, 'collisionStart', (event) => {
         if ((bodyA.label === 'topLine' && bodyB.label.startsWith('item-')) ||
             (bodyB.label === 'topLine' && bodyA.label.startsWith('item-'))) {
             const item = bodyA.label.startsWith('item-') ? bodyA : bodyB;
-            
-            // 检查物体是否确实在顶部线以上（即物体的顶部已经穿过了结束线）
-            const itemTop = item.position.y - item.circleRadius;
-            const topLinePosition = topLine.position.y;
-            
-            // 检查物体是否在0.5秒保护期内（刚生成的物体不会触发警告）
-            const currentTime = Date.now();
-            const isInProtectionPeriod = item.createdAt && (currentTime - item.createdAt) < 500; // 0.5秒保护期
-            
-            // 如果物体顶部已经到达或超过结束线位置，立即开始计时
-            if (!item.topLineContactTime && itemTop <= topLinePosition) {
-                item.topLineContactTime = Date.now();
-                
-                // 只有不在保护期内的物体才显示警告效果
-                if (!isInProtectionPeriod) {
-                    // 创建警告效果
-                    const warningElement = document.createElement('div');
-                    warningElement.className = 'warning-indicator';
-                    warningElement.style.position = 'absolute';
-                    warningElement.style.left = item.position.x + 'px';
-                    warningElement.style.top = '99px';
-                    warningElement.style.width = '50px';
-                    warningElement.style.height = '2px';
-                    warningElement.style.backgroundColor = 'rgba(255, 0, 0, 0.5)';
-                    warningElement.style.transition = 'width 3s linear';
-                    gameBoard.appendChild(warningElement);
-                    
-                    item.warningElement = warningElement;
-                    
-                    // 开始填充动画
-                    setTimeout(() => {
-                        if (warningElement.parentNode) {
-                            warningElement.style.width = '0';
-                        }
-                    }, 50);
-                }
-            }
-            
-            // 设置3秒的持续接触时间
-            const requiredContactTime = 3000;
-            
-            // 每100ms检查一次是否仍在接触
-            const checkInterval = setInterval(() => {
-                // 如果游戏已结束或物体被销毁，停止检查并移除警告效果
-                if (state.isGameOver || !item.position) {
-                    clearInterval(checkInterval);
-                    if (item.warningElement && item.warningElement.parentNode) {
-                        gameBoard.removeChild(item.warningElement);
-                    }
-                    return;
-                }
-                
-                // 检查物体是否仍在接触顶部区域（考虑一定的误差范围）
-                const itemTop = item.position.y - item.circleRadius;
-                const stillInContact = itemTop <= topLine.position.y + 5; // 允许5像素的误差范围
-                
-                if (!stillInContact) {
-                    // 如果不再接触，重置接触时间并移除警告效果
-                    item.topLineContactTime = null;
-                    if (item.warningElement && item.warningElement.parentNode) {
-                        gameBoard.removeChild(item.warningElement);
-                        item.warningElement = null;
-                    }
-                    clearInterval(checkInterval);
-                } else {
-                    // 更新警告效果的位置
-                    if (item.warningElement) {
-                        item.warningElement.style.left = (item.position.x - 25) + 'px';
-                        
-                        // 只有在物体持续接触时才检查时间
-                        const contactDuration = Date.now() - item.topLineContactTime;
-                        if (contactDuration >= requiredContactTime && !state.isGameOver) {
-                            // 最后再次确认物体仍在接触
-                            const itemTop = item.position.y - item.circleRadius;
-                            const finalCheck = itemTop <= topLine.position.y + 10; // 最终检查时允许更大的误差
-                            if (finalCheck) {
-                                gameBoard.removeChild(item.warningElement);
-                                item.warningElement = null;
-                                gameOver();
-                            } else {
-                                // 如果最后检查发现已经离开，重置计时
-                                item.topLineContactTime = null;
-                                gameBoard.removeChild(item.warningElement);
-                                item.warningElement = null;
-                            }
-                            clearInterval(checkInterval);
-                        }
-                    }
-                }
-            }, 100);
+            handleTopLineWarning(item);
         }
     }
 });
