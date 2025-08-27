@@ -427,6 +427,24 @@ canvas svg {
 
 /* 冷却动画样式已移除 */
 
+/* 游戏标题装饰元素样式 */
+.game-title-decor {
+    font-size: 1.5rem;
+    color: #f39c12;
+    animation: sparkle 1.5s infinite;
+}
+
+@keyframes sparkle {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.5;
+        transform: scale(1.2);
+    }
+}
+
 @media (max-width: 600px) {
     #game-board {
         height: 450px;
